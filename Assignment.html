@@ -131,11 +131,19 @@ set.seed(42)</code></pre>
 <pre class="r"><code> cfit &lt;- rpart(class ~.,data = df)</code></pre>
 <p>Then the classifier is tested on the same dataset which was used in training (the entire dataset). And then the confusion matrix is obtained</p>
 <pre class="r"><code>predictions &lt;- predict(cfit, df, type=&quot;class&quot;)
-mat &lt;- table(predictions, df$class)</code></pre>
+mat &lt;- table(predictions, df$class)
+mat</code></pre>
+<pre><code>##            
+## predictions  M  R
+##           M 95 10
+##           R 16 87</code></pre>
 <p>Now doing some evaluations :</p>
 <p><strong>Accuracy:</strong> Overall, how often is the classifier correct (TP+TN)/total =</p>
 <pre class="r"><code>(mat[1,&quot;M&quot;] + mat[2,&quot;R&quot;]) / 208</code></pre>
 <pre><code>## [1] 0.875</code></pre>
+<p><strong>Error:</strong> How often is the classifier incorrect</p>
+<pre class="r"><code>1- ((mat[1,&quot;M&quot;] + mat[2,&quot;R&quot;]) / 208)</code></pre>
+<pre><code>## [1] 0.125</code></pre>
 <p><strong>Precision:</strong> When it predicts “M”, how often is it correct , TP = predicted “M” Right TP/(predicted “M”) =</p>
 <pre class="r"><code>p &lt;- mat[1,&quot;M&quot;] / (mat[1,&quot;R&quot;] + mat[1,&quot;M&quot;])
 p</code></pre>
@@ -185,6 +193,9 @@ r</code></pre>
 <p><strong>Accuracy</strong></p>
 <pre class="r"><code>mean(acc)</code></pre>
 <pre><code>## [1] 0.75</code></pre>
+<p><strong>Error</strong></p>
+<pre class="r"><code>1-mean(acc)</code></pre>
+<pre><code>## [1] 0.25</code></pre>
 <p><strong>Precision</strong></p>
 <pre class="r"><code>mean(p)</code></pre>
 <pre><code>## [1] 0.7671459</code></pre>
@@ -194,10 +205,114 @@ r</code></pre>
 <p><strong>F1_Score</strong></p>
 <pre class="r"><code>mean(f1)</code></pre>
 <pre><code>## [1] 0.7553416</code></pre>
-<p>As we can see the evaluation measures are worse after using the 10-fold validation as in the first case the whole data was used to build the classifier and the same data was used in prediction which is not the case when doing the 10-fold validation.</p>
+<p>As we can see the evaluation measures are worse after using the 10-fold validation as in the first case the whole data was used to build the classifier and the exact same data was used in prediction which is not the case when doing the 10-fold validation.</p>
 </div>
 <div id="part-2" class="section level1">
 <h1>Part 2</h1>
+<p>We can store the above cross validation code into a function inorder to avoid duplicating code as follow</p>
+<pre class="r"><code> cross_validate &lt;- function(df,block,classifier)
+ {
+ acc = numeric(0)
+ p = numeric(0)
+ r = numeric(0)
+ f1 = numeric(0)
+ one = c(&quot;Accuracy&quot;,&quot;Error&quot;,&quot;Precision&quot;,&quot;Recall&quot;,&quot;F1_score&quot;)
+ for(k in 1:K) {
+     # build classifier with all blocks that are not K 
+     cfit &lt;- classifier(class ~.,data = df[block!= k,])
+     # predict the output of the k block 
+     predictions &lt;- predict(cfit, df[block == k,], type=&quot;class&quot;)
+     # store all the neccessary evals to get their mean later 
+     mat &lt;- table(predictions, df$class[block == k])
+     acc &lt;- rbind(acc,(mat[1,&quot;M&quot;] + mat[2,&quot;R&quot;]) / (mat[1,&quot;M&quot;] + mat[2,&quot;M&quot;]+mat[1,&quot;R&quot;] + mat[2,&quot;R&quot;]))
+     ptemp = mat[1,&quot;M&quot;] / (mat[1,&quot;R&quot;] + mat[1,&quot;M&quot;])
+     p &lt;- rbind(p,ptemp)
+     rtemp = mat[1,&quot;M&quot;] / (mat[1,&quot;M&quot;] + mat[2,&quot;M&quot;])
+     r &lt;- rbind(r,rtemp)
+     f1 &lt;- rbind(f1,(2*ptemp*rtemp/(ptemp+rtemp)) )
+ }
+ two = c(mean(acc),(1-mean(acc)), mean(p), mean(r), mean(f1))
+ data.frame(one,two) 
+ }</code></pre>
+<div id="random-forest" class="section level3">
+<h3><strong>Random Forest</strong></h3>
+<pre class="r"><code> library(randomForest)</code></pre>
+<pre><code>## randomForest 4.6-12</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>## 
+## Attaching package: 'randomForest'</code></pre>
+<pre><code>## The following object is masked from 'package:dplyr':
+## 
+##     combine</code></pre>
+<pre class="r"><code> cross_validate(df,block,randomForest)</code></pre>
+<pre><code>##         one       two
+## 1  Accuracy 0.8350000
+## 2     Error 0.1650000
+## 3 Precision 0.7977273
+## 4    Recall 0.9345328
+## 5  F1_score 0.8523665</code></pre>
+</div>
+<div id="support-vector-machine" class="section level3">
+<h3><strong>Support Vector Machine</strong></h3>
+<pre class="r"><code>  library(e1071)
+cross_validate(df,block,svm)</code></pre>
+<pre><code>##         one       two
+## 1  Accuracy 0.8450000
+## 2     Error 0.1550000
+## 3 Precision 0.8315801
+## 4    Recall 0.8987753
+## 5  F1_score 0.8532791</code></pre>
+</div>
+<div id="naive-bayes" class="section level3">
+<h3><strong>Naive Bayes</strong></h3>
+<pre class="r"><code>cross_validate(df,block,naiveBayes)</code></pre>
+<pre><code>##         one       two
+## 1  Accuracy 0.6900000
+## 2     Error 0.3100000
+## 3 Precision 0.7661508
+## 4    Recall 0.6002778
+## 5  F1_score 0.6588185</code></pre>
+</div>
+<div id="neural-networks" class="section level3">
+<h3><strong>Neural Networks</strong></h3>
+<pre class="r"><code>library(&quot;neuralnet&quot;)</code></pre>
+<pre><code>## Loading required package: grid</code></pre>
+<pre><code>## Loading required package: MASS</code></pre>
+<pre><code>## 
+## Attaching package: 'MASS'</code></pre>
+<pre><code>## The following object is masked from 'package:dplyr':
+## 
+##     select</code></pre>
+<pre><code>## 
+## Attaching package: 'neuralnet'</code></pre>
+<pre><code>## The following object is masked from 'package:dplyr':
+## 
+##     compute</code></pre>
+<p>For some reason the formula y~. is not accepted in the neuralnet() function. So we have to write the formula ourselves and the function cross_validate cant be called in this one also i encountered a problem running the neural network classifier as the column of class is of type String and it should be an integer so i introduced a modified data frame to run the neural network classifier on and rewrote the formula to be used with the classifier</p>
+<pre class="r"><code> df_NN&lt;- df
+ df_NN$class2[df_NN$class == &quot;R&quot;] &lt;- 0
+ df_NN$class2[df_NN$class == &quot;M&quot;] &lt;- 1
+ df_NN$class&lt;- df_NN$class2
+ df_NN$class2 &lt;- NULL
+ n &lt;- names(df_NN)
+f &lt;- as.formula(paste(&quot;class ~&quot;, paste(n[!n %in% &quot;class&quot;], collapse = &quot; + &quot;)))</code></pre>
+<p>Now it is possible to run the Neural network classifier and it will ran using 10-fold cross validation Experimenting with number of hidden layers here we set 2 hidden layers first one with 5 and 3 neurons each</p>
+<pre class="r"><code>cv.error &lt;- numeric(0)
+
+ for(k in 1:K) {
+   train &lt;- df_NN[block!= k,]
+   test &lt;- df_NN[block== k,]
+     nn &lt;- neuralnet(f,train,hidden=c(5,3),linear.output=T)
+    pr.nn &lt;- compute(nn,test[,1:60])
+    pr.nn &lt;- pr.nn$net.result*(max(df_NN$class)-min(df_NN$class))+min(df_NN$class)
+    
+    test.r &lt;- (test$class)*(max(df_NN$class)-min(df_NN$class))+min(df_NN$class)
+    
+    cv.error &lt;- rbind(cv.error,sum((test.r - pr.nn)^2)/nrow(test) ) 
+ }
+mean(cv.error)</code></pre>
+<pre><code>## [1] 0.1795719555</code></pre>
+</div>
 </div>
 
 

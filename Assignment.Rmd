@@ -26,6 +26,7 @@ And then the confusion matrix is obtained
 ```{r}
 predictions <- predict(cfit, df, type="class")
 mat <- table(predictions, df$class)
+mat
 ```
 
 Now doing some evaluations : 
@@ -36,6 +37,11 @@ __Accuracy:__  Overall, how often is the classifier correct
 (mat[1,"M"] + mat[2,"R"]) / 208
 ```
 
+__Error:__ How often is the classifier incorrect 
+
+```{r}
+1- ((mat[1,"M"] + mat[2,"R"]) / 208)
+```
 __Precision:__  When it predicts "M", how often is it correct , TP = predicted "M" Right 
 TP/(predicted "M") = 
 ```{r}
@@ -114,6 +120,11 @@ __Accuracy__
 mean(acc)
 ```
 
+__Error__ 
+```{r}
+1-mean(acc)
+```
+
 __Precision__ 
 ```{r}
 mean(p)
@@ -129,6 +140,95 @@ mean(f1)
 ```
 
 
-As we can see the evaluation measures are worse after using the 10-fold validation as in the first case the whole data was used to build the classifier and the same data was used in prediction which is not the case when doing the 10-fold validation.
+As we can see the evaluation measures are worse after using the 10-fold validation as in the first case the whole data was used to build the classifier and the exact same data was used in prediction which is not the case when doing the 10-fold validation.
 
 #Part 2#
+ We can store the above cross validation code into a function inorder to avoid duplicating code as follow
+ 
+```{r}
+ cross_validate <- function(df,block,classifier)
+ {
+ acc = numeric(0)
+ p = numeric(0)
+ r = numeric(0)
+ f1 = numeric(0)
+ one = c("Accuracy","Error","Precision","Recall","F1_score")
+ for(k in 1:K) {
+     # build classifier with all blocks that are not K 
+     cfit <- classifier(class ~.,data = df[block!= k,])
+     # predict the output of the k block 
+     predictions <- predict(cfit, df[block == k,], type="class")
+     # store all the neccessary evals to get their mean later 
+     mat <- table(predictions, df$class[block == k])
+     acc <- rbind(acc,(mat[1,"M"] + mat[2,"R"]) / (mat[1,"M"] + mat[2,"M"]+mat[1,"R"] + mat[2,"R"]))
+     ptemp = mat[1,"M"] / (mat[1,"R"] + mat[1,"M"])
+     p <- rbind(p,ptemp)
+     rtemp = mat[1,"M"] / (mat[1,"M"] + mat[2,"M"])
+     r <- rbind(r,rtemp)
+     f1 <- rbind(f1,(2*ptemp*rtemp/(ptemp+rtemp)) )
+ }
+ two = c(mean(acc),(1-mean(acc)), mean(p), mean(r), mean(f1))
+ data.frame(one,two) 
+ }
+```
+
+###__Random Forest__###
+
+```{r}
+ library(randomForest)
+ cross_validate(df,block,randomForest)
+```
+
+###__Support Vector Machine__###
+
+```{r}
+  library(e1071)
+cross_validate(df,block,svm)
+```
+
+###__Naive Bayes__###
+
+```{r}
+cross_validate(df,block,naiveBayes)
+```
+
+
+###__Neural Networks__###
+
+```{r}
+library("neuralnet")
+```
+
+For some reason the formula y~. is not accepted in the neuralnet() function. So we have to write the formula ourselves and the function cross_validate cant be called in this one  also i encountered a problem running the neural network classifier as the column of class is of type String and it should be an integer so i introduced a modified data frame to run the neural network classifier on  and rewrote the formula to be used with the classifier 
+```{r}
+ df_NN<- df
+ df_NN$class2[df_NN$class == "R"] <- 0
+ df_NN$class2[df_NN$class == "M"] <- 1
+ df_NN$class<- df_NN$class2
+ df_NN$class2 <- NULL
+ n <- names(df_NN)
+f <- as.formula(paste("class ~", paste(n[!n %in% "class"], collapse = " + ")))
+```
+
+Now it is possible to run the Neural network classifier and it will ran using 10-fold cross validation 
+Experimenting with number of hidden layers here we set 2 hidden layers first one with 5 and 3 neurons each 
+
+```{r}
+ 
+cv.error <- numeric(0)
+
+ for(k in 1:K) {
+   train <- df_NN[block!= k,]
+   test <- df_NN[block== k,]
+     nn <- neuralnet(f,train,hidden=c(5,3),linear.output=T)
+    pr.nn <- compute(nn,test[,1:60])
+    pr.nn <- pr.nn$net.result*(max(df_NN$class)-min(df_NN$class))+min(df_NN$class)
+    
+    test.r <- (test$class)*(max(df_NN$class)-min(df_NN$class))+min(df_NN$class)
+    
+    cv.error <- rbind(cv.error,sum((test.r - pr.nn)^2)/nrow(test) ) 
+ }
+mean(cv.error)
+ 
+```
+

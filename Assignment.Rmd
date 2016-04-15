@@ -232,3 +232,102 @@ mean(cv.error)
  
 ```
 
+#Part 3#
+
+Now we import more data sets to test the algorithms more and try to check when one is better  and forming our matrix 
+
+```{r}
+hyp <- read.csv("~/Desktop/csen1061-assignment-modeling/hyp.csv", header=FALSE)
+diab <- read.csv("~/Desktop/csen1061-assignment-modeling/diab.csv", header=FALSE)
+
+
+error_table <- matrix(nrow=4, ncol=4)
+rownames(error_table) <- c('Sonar','Hepatitis','Spect','Pima-indians')
+colnames(error_table) <- c('Decision_Tree ','Random_Forest','Support_Vector_Machine','Naive_Bayes')
+
+```
+
+Now we need to run the algorithms on each dataset 10 times using 10-fold cross validation but with changing the content of the fold we will begin filling data of the first frame "Sonar" 
+
+```{r}
+ n <- nrow(df)
+ K <- 10
+ rowsInFold <- n %/% K
+ rang <- rank(runif(n))
+ block <- (rang-1) %/% rowsInFold +1
+ block <- as.factor(block)
+```
+
+Now we will proceed to with 10 times of 10 fold cross validation by first randomizing the content of the block vector inorder to have different fold in each iteration of the 10 
+
+```{r}
+ total_error_one <- numeric(0)
+  total_error_two <- numeric(0)
+ total_error_three <- numeric(0)
+ total_error_four <- numeric(0)
+
+ for(k in 1:K) {
+   sample(block)
+   a <- cross_validate(df,block,rpart)
+   b <- cross_validate(df,block,randomForest)
+   c <- cross_validate(df,block,svm)
+   d <- cross_validate(df,block,naiveBayes)
+
+   total_error_one<- rbind(total_error_one, a$two[2])
+    total_error_two<- rbind(total_error_two, b$two[2])
+   total_error_three<- rbind(total_error_three, c$two[2])
+   total_error_four<- rbind(total_error_four, d$two[2])
+
+ }
+ error_table[1,1] = mean(total_error_one)
+error_table[1,2] = mean(total_error_two)
+ error_table[1,3] = mean(total_error_three)
+ error_table[1,4] = mean(total_error_four)
+
+```
+
+Now doing the same thing with the other data Sets next is the Hepatitis data Set 
+
+```{r}
+ colnames(hyp)[which(names(hyp) == "V20")] <- "class"
+ n <- nrow(hyp)
+ K <- 10
+ rowsInFold <- n %/% K
+ rang <- rank(runif(n))
+ block <- (rang-1) %/% rowsInFold +1
+ block <- as.factor(block)
+```
+
+<!--
+
+```{r  eval=FALSE}
+
+ total_error_one <- numeric(0)
+  total_error_two <- numeric(0)
+ total_error_three <- numeric(0)
+ total_error_four <- numeric(0)
+
+ for(k in 1:K) {
+   sample(block)
+   a <- cross_validate(hyp,block,rpart)
+   b <- cross_validate(hyp,block,randomForest)
+   c <- cross_validate(hyp,block,svm)
+   d <- cross_validate(hyp,block,naiveBayes)
+
+   total_error_one<- rbind(total_error_one, a$two[2])
+    total_error_two<- rbind(total_error_two, b$two[2])
+   total_error_three<- rbind(total_error_three, c$two[2])
+   total_error_four<- rbind(total_error_four, d$two[2])
+
+ }
+ error_table[2,1] = mean(total_error_one)
+error_table[2,2] = mean(total_error_two)
+ error_table[2,3] = mean(total_error_three)
+ error_table[2,4] = mean(total_error_four) 
+```
+--> 
+
+Didnt have time to finish but proceed to fill the error_table as the previous example to fill the whole table and compare the results 
+```{r}
+error_table
+```

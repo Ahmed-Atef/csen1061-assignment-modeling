@@ -1,0 +1,134 @@
+---
+title: Assignment One
+---
+
+```{r}
+library(rpart)
+library(dplyr)
+df <- read.csv("~/Desktop/csen1061-assignment-modeling/Mines_Rocks.csv", header=FALSE)
+colnames(df)[which(names(df) == "V61")] <- "class"
+set.seed(42)
+```
+
+
+#Part 1 : Decision tree#
+
+
+First CART was used to form the decision Tree using the entire dataset as the learning set  
+
+```{r}
+ cfit <- rpart(class ~.,data = df)
+```
+
+Then the classifier is tested on the same dataset which was used in training (the entire dataset).
+And then the confusion matrix is obtained 
+
+```{r}
+predictions <- predict(cfit, df, type="class")
+mat <- table(predictions, df$class)
+```
+
+Now doing some evaluations : 
+
+__Accuracy:__  Overall, how often is the classifier correct 
+(TP+TN)/total = 
+```{r}
+(mat[1,"M"] + mat[2,"R"]) / 208
+```
+
+__Precision:__  When it predicts "M", how often is it correct , TP = predicted "M" Right 
+TP/(predicted "M") = 
+```{r}
+p <- mat[1,"M"] / (mat[1,"R"] + mat[1,"M"])
+p
+```
+
+When it predicts "R",  how often is it correct  , TP = predicted "R" Right 
+TP/(predicted "R") = 
+```{r}
+mat[2,"R"] / (mat[2,"R"] + mat[2,"M"])
+```
+
+__Recall:__  When it's actually "M", how often does it predict "M" , TP = predicted "M" Right 
+TP/(actual "M" in the data )
+```{r}
+r <- mat[1,"M"] / (mat[1,"M"] + mat[2,"M"])
+r
+```
+
+ When it's actually "R", how often does it predict "R" , TP = predicted "R" Right 
+TP/(actual "R" in the data )
+```{r}
+mat[2,"R"] / (mat[1,"R"] + mat[2,"R"])
+```
+
+__F1_score:__ which is the harmonic mean of precision and recall assuming that this question was asked "Is it 'M'  ?"
+F1 = 2pr/(p+r) = 
+```{r}
+2*p*r/(p+r)
+```
+
+
+Training and testing a classifier on the same data leads to over-fitting and false results (too opti-mistic).
+Now we use the k-fold cross-validation to test the classifier where K = 10 . 
+
+```{r}
+ n <- nrow(df)
+ K <- 10
+ rowsInFold <- n %/% K
+ rang <- rank(runif(n))
+ block <- (rang-1) %/% rowsInFold +1
+ block <- as.factor(block)
+```
+
+Now the block vector contains the the corresponding fold of each row and now we can proceed with the classification 
+
+
+```{r}
+ # variables to store the accuray precision recall and f1
+ acc = numeric(0)
+ p = numeric(0)
+ r = numeric(0)
+ f1 = numeric(0)
+ 
+  for(k in 1:K) {
+    # build classifier with all blocks that are not K 
+     cfit <- rpart(class ~.,data = df[block!= k,])
+    # predict the output of the k block 
+     predictions <- predict(cfit, df[block == k,], type="class")
+    # store all the neccessary evals to get their mean later 
+     mat <- table(predictions, df$class[block == k])
+     acc <- rbind(acc,(mat[1,"M"] + mat[2,"R"]) / (mat[1,"M"] + mat[2,"M"]+mat[1,"R"] + mat[2,"R"]))
+     ptemp = mat[1,"M"] / (mat[1,"R"] + mat[1,"M"])
+     p <- rbind(p,ptemp)
+     rtemp = mat[1,"M"] / (mat[1,"M"] + mat[2,"M"])
+     r <- rbind(r,rtemp)
+     f1 <- rbind(f1,(2*ptemp*rtemp/(ptemp+rtemp)) )
+ }
+```
+
+Now we find the mean of all of what we obtained so far
+
+__Accuracy__ 
+```{r}
+mean(acc)
+```
+
+__Precision__ 
+```{r}
+mean(p)
+```
+
+__Recall__ 
+```{r}
+mean(r)
+```
+__F1_Score__ 
+```{r}
+mean(f1)
+```
+
+
+As we can see the evaluation measures are worse after using the 10-fold validation as in the first case the whole data was used to build the classifier and the same data was used in prediction which is not the case when doing the 10-fold validation.
+
+#Part 2#
